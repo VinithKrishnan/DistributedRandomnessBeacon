@@ -1,1 +1,1 @@
-Spurt Distributed Randomness Beacon(/Generator) implementation
+Spurt Distributed Randomness Beacon/Generator) implementation
