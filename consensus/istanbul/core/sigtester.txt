@@ -1,0 +1,150 @@
+package main
+
+import (
+
+	// "math/big"
+	// "reflect"
+
+	// "time"
+
+	"encoding/hex"
+	"fmt"
+	"strconv"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	// "github.com/ethereum/go-ethereum/consensus/istanbul"
+	"github.com/ethereum/go-ethereum/core/types"
+	bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
+	ed25519 "github.com/ethereum/go-ethereum/filippo.io/edwards25519"
+)
+
+var pubKeys map[common.Address]*ed25519.Point
+var blspubKeys map[common.Address]*bn256.G2
+var blsmemkeys map[common.Address]*bn256.G1
+var addrIDMap map[common.Address]int
+var idAddrMap map[int]common.Address
+var addrs []string
+
+var edKey types.EdKey
+var blsKey types.BLSKey
+var logdir string
+
+func start(index int) types.BLSKey {
+	pkPath := "/mnt/c/Users/VinithKrishnan/drb-expt/pubkey.json"
+	blspkPath := "/mnt/c/Users/VinithKrishnan/drb-expt/blspubkey.json"
+	blsmkPath := "/mnt/c/Users/VinithKrishnan/drb-expt/blsmemkey.json"
+	edkeyPath := "key.json"
+	blskeyPath := "blskey.json"
+
+	local := true
+
+	logdir = "/home/ubuntu/drb/"
+	if local {
+		edkeyPath = "/mnt/c/Users/VinithKrishnan/drb-expt/edkeys/k" + strconv.Itoa(index) + ".json"
+		blskeyPath = "/mnt/c/Users/VinithKrishnan/drb-expt/blskeys/k" + strconv.Itoa(index) + ".json"
+
+		logdir = "/mnt/c/Users/VinithKrishnan/drb-expt/drb/log/" // should be changed to variable ofr reproducability purpose
+	}
+
+	// initializing number of nodes an threshold
+	// c.setNumNodesTh(len(vals))
+
+	// Load the nodes from the config file.
+	var ednodelist []string
+	if err := common.LoadJSON(pkPath, &ednodelist); err != nil {
+		fmt.Println("Can't load node file", "path", pkPath, "error", err)
+
+	}
+	//  ("printing otu ednodelist", "value", len(ednodelist))
+	var blspknodelist []string
+	if err := common.LoadJSON(blspkPath, &blspknodelist); err != nil {
+		fmt.Println("Can't load node file", "path", blspkPath, "error", err)
+
+	}
+
+	var blsmknodelist []string
+	if err := common.LoadJSON(blsmkPath, &blsmknodelist); err != nil {
+		fmt.Println("Can't load node file", "path", blsmkPath, "error", err)
+
+	}
+
+	addrs = []string{"d1589d31c6674d5540be85baf60850bd39752e40", "9cc76c660e8679241090e69a967d17ea236e5bd3", "82ba6627a3453997fc46730e8dd54798f0253f00", "1d40498b6c909a40cba517e94f37692d54ea604f"}
+
+	var vals []common.Address
+	for _, s := range addrs {
+		data, _ := hex.DecodeString(s)
+		vals = append(vals, common.BytesToAddress(data))
+	}
+
+	fmt.Println(len(vals))
+	pubKeys = make(map[common.Address]*ed25519.Point)
+	blspubKeys = make(map[common.Address]*bn256.G2)
+	blsmemkeys = make(map[common.Address]*bn256.G1)
+	addrIDMap = make(map[common.Address]int)
+	idAddrMap = make(map[int]common.Address)
+
+	for i, val := range vals {
+		addrIDMap[val] = i
+		idAddrMap[i] = val
+		pubKeys[val] = types.EdStringToPoint(ednodelist[i])
+		blspubKeys[val] = types.G2StringToPoint(blspknodelist[i])
+		blsmemkeys[val] = types.G1StringToPoint(blsmknodelist[i])
+		fmt.Println("Initializing pkeys", "addr", val, "idx", i)
+	}
+	address := idAddrMap[index]
+	// position := addrIDMap[address]
+
+	// loads the key into the key of the user
+	var edstrKey types.EdStringKey
+	if err := common.LoadJSON(edkeyPath, &edstrKey); err != nil {
+		fmt.Println("Can't load node file", "path", edkeyPath, "error", err)
+
+	}
+	// log.Info("String Key is:", strKey)
+	edKey = types.EdStringToKey(edstrKey)
+	fmt.Println("Initializing local key", "addr", address, "pkey", edstrKey.Pkey)
+
+	var BLSstrKey types.BLSStringKey
+	if err := common.LoadJSON(blskeyPath, &BLSstrKey); err != nil {
+		fmt.Println("Can't load node file", "path", blskeyPath, "error", err)
+
+	}
+	// log.Info("String Key is:", strKey)
+	blsKey = types.BLSStringToKey(BLSstrKey)
+	// 	// fmt.Println("Initializing local key", "addr", address, "pkey", BLSstrKey.Mkey)
+	// 	// elog.Info("Initializing local key", "addr", c.address, "mkey", c.blsKey.Mkey, "skey", c.blsKey.Skey)
+
+	// }
+	return blsKey
+}
+
+func TestBLSSign() {
+
+	var pubkeys []*bn256.G2
+
+	for _, value := range blspubKeys {
+		pubkeys = append(pubkeys, value)
+	}
+	// for i:=0;i<3;i++{
+	// emptyByteVar := make([]byte, 128)
+	// _ = crypto.BlsSign(pubkeys, &blsKey.Skey, &blsKey.Mkey, emptyByteVar)
+
+	var SignList []*bn256.G1
+	message := []byte{byte(0)}
+	for i := 1; i < 4; i++ {
+		blskey := start(i)
+		SignList = append(SignList, crypto.BlsSign(pubkeys, &blskey.Skey, &blskey.Mkey, message))
+	}
+	AggPk, AggSign := crypto.SignAggregator(pubkeys, SignList)
+	nodelist := []int{2, 3, 4}
+	apk, _ := crypto.KeyAgg(pubkeys)
+	nodelist = []int{2, 3, 1}
+	fmt.Println(apk)
+	fmt.Println(crypto.Verify(nodelist, apk, message, AggPk, AggSign))
+}
+
+func main() {
+	TestBLSSign()
+}

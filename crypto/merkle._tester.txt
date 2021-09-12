@@ -1,0 +1,32 @@
+package main
+
+import (
+	"crypto/sha256"
+
+	"github.com/ethereum/go-ethereum/onrik/gomerkle"
+)
+
+func main() {
+	data := [][]byte{
+		[]byte("Buzz"),
+		[]byte("Lenny"),
+		[]byte("Squeeze"),
+		[]byte("Wheezy"),
+		[]byte("Jessie"),
+		[]byte("Stretch"),
+		[]byte("Buster"),
+	}
+	tree := gomerkle.NewTree(sha256.New())
+	tree.AddData(data...)
+
+	err := tree.Generate()
+	if err != nil {
+		panic(err)
+	}
+
+	// Proof for Jessie
+	proof := tree.GetProof(4)
+	leaf := tree.GetLeaf(4)
+	newtree := gomerkle.NewTree(sha256.New())
+	println(newtree.VerifyProof(proof, tree.Root(), leaf))
+}
